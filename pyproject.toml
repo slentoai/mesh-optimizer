@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mesh-optimizer"
+version = "0.1.0"
+description = "Distributed hardware optimization agent for the Mesh Optimizer platform"
+readme = "README.md"
+license = {text = "Apache-2.0"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Slento Systems", email = "engineering@slentosystems.com"},
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: Apache Software License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: System :: Hardware",
+    "Topic :: System :: Monitoring",
+    "Topic :: System :: Systems Administration",
+]
+dependencies = [
+    "aiohttp>=3.9",
+    "fastapi>=0.110",
+    "psutil>=5.9",
+    "pydantic>=2.0",
+    "pyyaml>=6.0",
+    "uvicorn[standard]>=0.27",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.23",
+    "httpx>=0.27",
+    "ruff>=0.3",
+]
+
+[project.urls]
+Homepage = "https://slentosystems.com"
+Documentation = "https://docs.slentosystems.com"
+Repository = "https://github.com/slentoai/mesh-optimizer"
+Issues = "https://github.com/slentoai/mesh-optimizer/issues"
+
+[project.scripts]
+mesh-optimizer = "mesh_optimizer.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["mesh_optimizer*"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "N", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"

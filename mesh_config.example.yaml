@@ -1,0 +1,98 @@
+# Mesh Optimizer Agent Configuration
+# Copy this file to mesh_config.yaml and edit as needed.
+
+# Controller URL — the address of your Mesh Optimizer controller.
+# Get this from your controller deployment or portal.slentosystems.com.
+controller_url: "https://controller.example.com:8401"
+
+# Log level: DEBUG, INFO, WARNING, ERROR
+log_level: INFO
+
+# Local data directory for caches and temp files
+data_dir: data
+
+# -- Node Settings ------------------------------------------------------------
+node:
+  # Node name (leave empty to auto-detect hostname)
+  name: ""
+
+  # Listen address and port for the agent API
+  host: "0.0.0.0"
+  agent_port: 8400
+
+  # Tags for this node (used by the controller for job routing)
+  tags: []
+  # tags:
+  #   - gpu
+  #   - amd
+  #   - production
+
+  # Public URL for WAN deployments (controller uses this to reach the agent).
+  # Leave empty for LAN setups.
+  # public_url: "https://agent1.example.com:8400"
+  public_url: ""
+
+  # NAT mode: enable if this agent is behind a firewall/NAT.
+  # In NAT mode, the agent does not start an API server — it only pushes
+  # heartbeats and polls for jobs. No port forwarding needed.
+  nat_mode: false
+
+  # How often to poll for jobs in NAT mode (seconds)
+  nat_poll_interval_s: 15.0
+
+  # Community Atlas Sharing — help improve optimization for everyone.
+  #
+  # When enabled (default), anonymized performance data from your probes is
+  # periodically sent to the Slento community hub. This data is aggregated
+  # across all opted-in users to train a global optimization model.
+  #
+  # What IS shared:
+  #   - Hardware class (e.g., "RDNA3_24GB", "Xeon_16C") — NOT exact model names
+  #   - Kernel performance numbers (throughput, bandwidth, latency)
+  #   - Optimal parameter values (block sizes, tile dimensions, ILP chains)
+  #   - Performance invariants (cliff boundaries, saturation points)
+  #
+  # What is NOT shared:
+  #   - Hostnames, IP addresses, MAC addresses
+  #   - File paths, environment variables, job commands
+  #   - Any data that could identify you, your company, or your workloads
+  #
+  # In return, your controller receives community model updates that include
+  # optimization insights from hardware you don't have access to.
+  #
+  # Set to false to opt out. Your mesh works identically either way.
+  share_atlas_data: true
+
+# -- Controller Communication ------------------------------------------------
+controller:
+  # How often to send heartbeats (seconds)
+  heartbeat_interval_s: 10.0
+
+  # How long before the controller marks this node as offline
+  node_timeout_s: 120.0
+
+  # How often to run benchmark probes (seconds). Default: 6 hours.
+  probe_interval_s: 21600
+
+# -- Security -----------------------------------------------------------------
+security:
+  # HMAC secret for token auth (auto-generated if empty)
+  auth_secret: ""
+
+  # Enable token authentication (requires controller to issue tokens)
+  require_auth: false
+
+  # TLS settings (optional — for encrypted agent-controller communication)
+  # tls_cert_path: /etc/mesh-optimizer/agent.pem
+  # tls_key_path: /etc/mesh-optimizer/agent-key.pem
+  # tls_ca_path: /etc/mesh-optimizer/ca.pem
+  verify_tls: true
+
+# -- Licensing ----------------------------------------------------------------
+licensing:
+  # License key from portal.slentosystems.com
+  # Leave empty for community mode (free, unlimited nodes, basic features).
+  license_key: ""
+
+  # License validation endpoint
+  portal_url: "https://portal.slentosystems.com"
