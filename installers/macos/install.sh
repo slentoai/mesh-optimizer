@@ -276,20 +276,33 @@ info "Upgrading pip..."
 success "pip upgraded"
 
 info "Installing $PACKAGE_NAME..."
+
+GITHUB_REPO="https://github.com/slentoai/mesh-optimizer.git"
+CONTROLLER_REPO="https://github.com/slentoai/mesh-controller.git"
+
 if "$VENV_DIR/bin/pip" install "$PACKAGE_NAME" --quiet 2>/dev/null; then
     MESH_VERSION=$("$VENV_DIR/bin/pip" show "$PACKAGE_NAME" 2>/dev/null | grep -i '^Version:' | awk '{print $2}')
-    success "Installed $PACKAGE_NAME ${MESH_VERSION:-latest}"
+    success "Installed $PACKAGE_NAME ${MESH_VERSION:-latest} from PyPI"
+elif "$VENV_DIR/bin/pip" install "git+${GITHUB_REPO}" --quiet 2>/dev/null; then
+    MESH_VERSION="dev"
+    success "Installed $PACKAGE_NAME from GitHub source"
 else
-    warn "Package '$PACKAGE_NAME' not found on PyPI (may not be published yet)"
-    info "Creating placeholder entry point"
-    mkdir -p "$VENV_DIR/bin"
-    cat > "$VENV_DIR/bin/mesh-optimizer" << 'ENTRY'
-#!/usr/bin/env bash
-echo "mesh-optimizer: package not yet installed. Run: ~/.mesh-optimizer/venv/bin/pip install mesh-optimizer"
-exit 1
-ENTRY
-    chmod +x "$VENV_DIR/bin/mesh-optimizer"
-    MESH_VERSION="(pending)"
+    warn "Package '$PACKAGE_NAME' not available on PyPI or GitHub"
+    info "Installing dependencies directly..."
+    "$VENV_DIR/bin/pip" install aiohttp fastapi psutil pydantic pyyaml "uvicorn[standard]" --quiet
+    MESH_VERSION="deps-only"
+    warn "Core dependencies installed — full package pending"
+fi
+
+# Install controller (licensed component) if license key is set
+# macOS users can set MESH_LICENSE_KEY env var before running installer
+if [[ -n "${MESH_LICENSE_KEY:-}" ]]; then
+    info "License key detected — installing mesh-controller..."
+    if "$VENV_DIR/bin/pip" install "git+${CONTROLLER_REPO}" --quiet 2>/dev/null; then
+        success "mesh-controller installed (licensed features enabled)"
+    else
+        warn "mesh-controller install failed — community features only"
+    fi
 fi
 
 # ─── Step 5: Generate default config ────────────────────────────────────────

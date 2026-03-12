@@ -179,18 +179,38 @@ info "pip upgraded"
 # ── Step 4: Install mesh-optimizer ──
 step 4 "Installing mesh-optimizer..."
 
-pip install mesh-optimizer -q 2>/dev/null || {
-    # If not yet on PyPI, install from source if available
-    if [ -f "setup.py" ] || [ -f "pyproject.toml" ]; then
-        pip install -e . -q
-        info "Installed from local source"
+MESH_VERSION=""
+GITHUB_REPO="https://github.com/slentoai/mesh-optimizer.git"
+CONTROLLER_REPO="https://github.com/slentoai/mesh-controller.git"
+
+# Try PyPI first, then GitHub source
+if pip install mesh-optimizer -q 2>/dev/null; then
+    MESH_VERSION=$(pip show mesh-optimizer 2>/dev/null | grep -i '^Version:' | awk '{print $2}')
+    info "Installed mesh-optimizer $MESH_VERSION from PyPI"
+elif pip install "git+${GITHUB_REPO}" -q 2>/dev/null; then
+    MESH_VERSION="dev"
+    info "Installed mesh-optimizer from GitHub source"
+elif [ -f "setup.py" ] || [ -f "pyproject.toml" ]; then
+    pip install -e . -q
+    MESH_VERSION="local"
+    info "Installed from local source"
+else
+    pip install aiohttp fastapi psutil pydantic pyyaml "uvicorn[standard]" -q
+    MESH_VERSION="deps-only"
+    warn "Package not available — installed dependencies directly"
+fi
+info "mesh-optimizer installed (${MESH_VERSION})"
+
+# Install controller (licensed component) if license key is provided
+if [ -n "$LICENSE_KEY" ]; then
+    info "License key provided — installing mesh-controller..."
+    if pip install "git+${CONTROLLER_REPO}" -q 2>/dev/null; then
+        info "mesh-controller installed (licensed features enabled)"
     else
-        # Install dependencies directly for now
-        pip install aiohttp fastapi psutil pydantic pyyaml "uvicorn[standard]" -q
-        warn "Package not yet on PyPI — installed dependencies directly"
+        warn "mesh-controller install failed — community features only"
+        warn "Ensure your license key is valid at https://portal.slentosystems.com"
     fi
-}
-info "mesh-optimizer installed"
+fi
 
 # ── Step 5: Configure ──
 step 5 "Configuring..."
@@ -217,9 +237,17 @@ node:
   # In NAT mode, the agent only makes outbound connections
   nat_mode: false
 
-  # Community atlas sharing: anonymized probe data is sent to improve the
-  # global optimization model. Set to false to opt out.
-  share_atlas_data: true
+  # JEPA optimization mode:
+  #   "centralized" — controller makes all optimization decisions (default)
+  #   "local"       — this node runs its own JEPA for fast local optimization
+  #   "off"         — no ML optimization, just monitoring and probes
+  jepa_mode: "centralized"
+
+# Hardware accelerators
+accelerators:
+  # Coral Edge TPU scheduling: offloads ML scheduling decisions to Coral,
+  # keeping GPUs free for compute. Auto-detected if present.
+  coral_tpu: "auto"  # "auto", "force", or "disabled"
 
 # Controller communication
 controller:
@@ -327,20 +355,13 @@ UNIT
     }
 
     if [ -f "$SERVICE_FILE" ]; then
-        info "Service already installed — updating"
-        install_service
+        info "Service already installed"
     elif [ "$SILENT" = true ]; then
         install_service
+    elif ask "Install as a systemd service? (auto-start on boot)"; then
+        install_service
     else
-        # Install by default — only skip if user explicitly opts out
-        info "The agent runs as a system service so it starts automatically on boot."
-        info "Hardware changes (GPU swaps, new devices) are detected on each restart"
-        info "and probed immediately."
-        if ask "Install system service? (recommended)"; then
-            install_service
-        else
-            info "Skipped — start manually: mesh-optimizer start"
-        fi
+        info "Skipped — start manually: mesh-optimizer start"
     fi
 else
     info "systemd not found — start manually: mesh-optimizer start"
