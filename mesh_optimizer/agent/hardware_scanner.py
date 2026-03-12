@@ -12,7 +12,7 @@ from pathlib import Path
 
 import psutil
 
-from mesh_optimizer.models import CPUInfo, FPGAInfo, GPUInfo, HardwareInventory
+from mesh_optimizer.models import CPUInfo, FPGAInfo, GPUInfo, HardwareInventory, TPUInfo
 
 logger = logging.getLogger(__name__)
 
@@ -27,9 +27,11 @@ def scan_hardware(hostname_override: str = "") -> HardwareInventory:
     inv.cpu = _detect_cpu()
     inv.gpus = _detect_gpus()
     inv.fpgas = _detect_fpgas()
+    inv.tpus = _detect_tpus()
     inv.has_pytorch = _check_pytorch()
     inv.has_rocm = shutil.which("rocm-smi") is not None
     inv.has_cuda = shutil.which("nvidia-smi") is not None
+    inv.has_coral = len(inv.tpus) > 0
     return inv
 
 
@@ -227,6 +229,55 @@ def _detect_fpgas() -> list[FPGAInfo]:
     except Exception:
         pass
     return fpgas
+
+
+# -- TPU Detection ------------------------------------------------------------
+
+def _detect_tpus() -> list[TPUInfo]:
+    """Detect Coral Edge TPU devices via sysfs and lspci."""
+    import glob as _glob
+
+    tpus = []
+    seen_pci = set()
+
+    # Method 1: /dev/apex_* (PCIe Coral with gasket/apex driver)
+    for dev_path in sorted(_glob.glob("/dev/apex_*")):
+        available = os.access(dev_path, os.R_OK | os.W_OK)
+        tpus.append(TPUInfo(
+            name="Coral Edge TPU (PCIe)",
+            device_path=dev_path,
+            interface="pcie",
+            peak_int8_tops=4.0,
+            available=available,
+        ))
+
+    # Method 2: lspci for PCI BDF
+    try:
+        out = subprocess.check_output(
+            ["lspci", "-D"], text=True, stderr=subprocess.DEVNULL, timeout=5,
+        )
+        for line in out.splitlines():
+            lower = line.lower()
+            if "coral" in lower or "edge tpu" in lower or "global unichip" in lower:
+                bdf = line.split()[0]
+                if bdf in seen_pci:
+                    continue
+                seen_pci.add(bdf)
+                if tpus:
+                    tpus[0].pcie_bdf = bdf
+                else:
+                    tpus.append(TPUInfo(
+                        name="Coral Edge TPU (PCIe)",
+                        pcie_bdf=bdf,
+                        interface="pcie",
+                        available=False,
+                    ))
+    except Exception:
+        pass
+
+    if tpus:
+        logger.info("Detected %d Coral Edge TPU(s)", len(tpus))
+    return tpus
 
 
 # -- Utility ------------------------------------------------------------------

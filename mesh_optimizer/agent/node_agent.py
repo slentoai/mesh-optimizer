@@ -63,12 +63,25 @@ class NodeAgent:
         # Discover local hardware
         self.hardware = scan_hardware(hostname_override=self.hostname)
         logger.info(
-            "Hardware: %d CPUs, %d GPUs, %d FPGAs, %dMB RAM",
+            "Hardware: %d CPUs, %d GPUs, %d FPGAs, %d TPUs, %dMB RAM",
             self.hardware.cpu.cores,
             len(self.hardware.gpus),
             len(self.hardware.fpgas),
+            len(self.hardware.tpus),
             self.hardware.memory_total_mb,
         )
+        if self.hardware.has_coral:
+            avail = sum(1 for t in self.hardware.tpus if t.available)
+            logger.info("Coral Edge TPU: %d device(s), %d available", len(self.hardware.tpus), avail)
+
+        # Apply atlas-derived optimization env vars to the agent process and
+        # configure the job executor so subprocess jobs inherit them too.
+        from mesh_optimizer.agent.gpu_optimizer import get_optimization_env, apply_to_process_env
+        from mesh_optimizer.agent.job_executor import set_hardware_info
+        opt_env = get_optimization_env(self.hardware)
+        apply_to_process_env(opt_env)
+        set_hardware_info(self.hardware)
+        logger.info("GPU optimizations applied: %d env vars", len(opt_env))
 
         # Check if hardware changed since last run
         self._hardware_changed = self._detect_hardware_change()

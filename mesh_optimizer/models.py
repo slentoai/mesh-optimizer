@@ -65,6 +65,15 @@ class FPGAInfo(BaseModel):
     driver: str = ""
 
 
+class TPUInfo(BaseModel):
+    name: str = "Coral Edge TPU"
+    device_path: str = ""         # e.g. "/dev/apex_0"
+    pcie_bdf: str = ""
+    interface: str = "pcie"       # "pcie" or "usb"
+    peak_int8_tops: float = 4.0   # 4 TOPS INT8
+    available: bool = False       # Device accessible + delegate loads
+
+
 class HardwareInventory(BaseModel):
     hostname: str = ""
     platform: str = ""
@@ -72,9 +81,11 @@ class HardwareInventory(BaseModel):
     memory_total_mb: int = 0
     gpus: List[GPUInfo] = Field(default_factory=list)
     fpgas: List[FPGAInfo] = Field(default_factory=list)
+    tpus: List[TPUInfo] = Field(default_factory=list)
     has_pytorch: bool = False
     has_rocm: bool = False
     has_cuda: bool = False
+    has_coral: bool = False
 
 
 # -- Health Models ------------------------------------------------------------

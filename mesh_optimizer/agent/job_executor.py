@@ -14,6 +14,9 @@ from mesh_optimizer.models import JobInfo, JobResult, JobStatus, JobType
 
 logger = logging.getLogger(__name__)
 
+# Cached optimization env vars (populated on first use via set_hardware_info)
+_optimization_env: Dict[str, str] = {}
+
 # Active jobs tracked by this executor
 _active_jobs: Dict[str, asyncio.Task] = {}
 
@@ -46,6 +49,8 @@ _BLOCKED_PATTERNS: List[re.Pattern] = [
 _ALLOWED_COMMANDS: Set[str] = {
     "from mesh_optimizer.",
     "import mesh_optimizer.",
+    "from product_runners.",
+    "import product_runners.",
 }
 
 # Resource limits for sandboxed commands
@@ -166,10 +171,18 @@ async def _run_command_job(job: JobInfo, node_id: str = "unknown") -> Dict[str, 
     )
 
     timeout = job.args.get("timeout_s", 3600)
+
+    # Build subprocess env with atlas-derived optimizations
+    sub_env = None
+    if _optimization_env:
+        from mesh_optimizer.agent.gpu_optimizer import build_subprocess_env
+        sub_env = build_subprocess_env(_optimization_env)
+
     proc = await asyncio.create_subprocess_exec(
         sys.executable, "-c", job.command,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
+        env=sub_env,
         preexec_fn=CommandSandbox.apply_resource_limits,
     )
     try:
@@ -183,6 +196,22 @@ async def _run_command_job(job: JobInfo, node_id: str = "unknown") -> Dict[str, 
         "stdout": stdout.decode()[-10000:],
         "stderr": stderr.decode()[-5000:],
     }
+
+
+def set_hardware_info(hardware_info, job_type: str = "general") -> None:
+    """Initialize optimization env vars for this executor.
+
+    Called once by NodeAgent after hardware scan so that all subprocess
+    jobs automatically inherit atlas-derived optimizations.
+    """
+    global _optimization_env
+    from mesh_optimizer.agent.gpu_optimizer import get_optimization_env
+    _optimization_env = get_optimization_env(hardware_info, job_type=job_type)
+    if _optimization_env:
+        logger.info(
+            "Job executor: %d optimization env vars loaded for subprocess jobs",
+            len(_optimization_env),
+        )
 
 
 def get_active_job_count() -> int:
